@@ -1,0 +1,62 @@
+# Git ignore for Ryu_Controller project
+# -------------------------------
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+.venv38/
+env/
+venv/
+ENV/
+venv.bak/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs and runtime files
+*.log
+*.pid
+mininet.log
+ryu.log
+
+# Databases
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.sublime-* 
+
+# Node
+node_modules/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Static files
+staticfiles/
+
+# Secrets / environment
+.env
+.env.*
+secrets.json
+
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# Other
+*.swp

@@ -2,329 +2,365 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Aplicación Ryu</title>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <title>SDN NSFNET Control</title>
     <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
     <div class="container mt-4">
-        <h1 class="text-center mb-4">Control Web para Ryu</h1>
-
-        <!-- Aplicaciones -->
+        <h1 class="text-center mb-4">Control de Red NSFNET</h1>
+        <!-- Control del Sistema -->
         <fieldset class="border p-4 mb-4">
-            <legend class="float-none w-auto px-3 h2 text-primary">Aplicaciones</legend>
-            <div class="mb-3">
-                <label for="app-select" class="form-label">Selecciona una aplicación:</label>
-                <select id="app-select" class="form-select">
-                    <option value="simple_switch.py">Simple Switch v1.0</option>
-                    <option value="simple_switch_13.py">Simple Switch v1.3</option>
-                    <option value="ofctl_rest.py">Ofctl Rest</option>
-                    <option value="rest_topology.py">REST topology</option>
-                    <option value="topologia">App para topologia</option>
-                </select>
+            <legend class="float-none w-auto px-3 h2 text-primary">Estado del Sistema</legend>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            Servicios
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Ryu Controller:</strong> <span id="ryu-status" class="badge bg-secondary">Desconocido</span></p>
+                            <p><strong>NSFNET:</strong> <span id="mininet-status" class="badge bg-secondary">Desconocido</span></p>
+                            <button id="refresh-status" class="btn btn-outline-info btn-sm">Actualizar Estado</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            Control
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button id="start-system" class="btn btn-success">Iniciar Sistema</button>
+                                <button id="stop-system" class="btn btn-danger">Detener Sistema</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <p class="text-muted">Siempre que inicie una aplicación, cuando termine de utilizarla debe <strong>Detener Aplicación</strong>.</p>
-
-            <div class="d-flex justify-content-start gap-3">
-                <button id="start-ryu" class="btn btn-primary">Iniciar Aplicación</button>
-                <button id="stop-ryu" class="btn btn-danger">Detener Aplicación</button>
-            </div>
-
-            <h2 class="mt-4">Estado:</h2>
-            <p id="status" class="border rounded p-2 bg-light text-secondary">Sin estado aún...</p>
+            <div id="system-status-message" class="alert mt-3" style="display: none;"></div>
         </fieldset>
 
-        <!-- Flujos -->
+        <!-- Routing Control -->
         <fieldset class="border p-4 mb-4">
-            <legend class="float-none w-auto px-3 h2 text-success">Flujos</legend>
-            <form id="postForm" class="row g-3">
+            <legend class="float-none w-auto px-3 h2 text-success">Control de Routing</legend>
+            <div class="row">
                 <div class="col-md-6">
-                    <label for="dpid" class="form-label">DPID:</label>
-                    <input type="number" id="dpid" name="dpid" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                    <label for="in_port" class="form-label">In Port:</label>
-                    <input type="number" id="in_port" name="in_port" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                    <label for="port" class="form-label">Out Port:</label>
-                    <input type="number" id="port" name="port" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                    <label for="idle_timeout" class="form-label">Idle Timeout:</label>
-                    <input type="number" id="idle_timeout" name="idle_timeout" class="form-control" value="30" required>
-                </div>
-                <div class="col-md-6">
-                    <label for="hard_timeout" class="form-label">Hard Timeout:</label>
-                    <input type="number" id="hard_timeout" name="hard_timeout" class="form-control" value="30" required>
+                    <div class="card">
+                        <div class="card-header">Algoritmo de Routing</div>
+                        <div class="card-body">
+                            <select id="routing-select" class="form-select mb-3">
+                                <option value="dijkstra_bw">Dijkstra (1/bandwidth)</option>
+                                <option value="shortest_hops">Shortest Path (hops)</option>
+                            </select>
+                            <button id="apply-routing" class="btn btn-primary">Aplicar Algoritmo</button>
+                            <div class="mt-3">
+                                <p class="text-muted small">
+                                    <strong>Dijkstra (1/bandwidth):</strong> Selecciona rutas optimizando el ancho de banda disponible.<br>
+                                    <strong>Shortest Path (hops):</strong> Selecciona rutas minimizando el número de saltos.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-6">
-                    <label for="priority" class="form-label">Priority:</label>
-                    <input type="number" id="priority" name="priority" class="form-control" value="11111" required>
+                    <div class="card">
+                        <div class="card-header">Estado del Routing</div>
+                        <div class="card-body">
+                            <p id="routing-status" class="text-muted">Estado: pendiente</p>
+                            <div id="routing-details" class="small">
+                                <!-- Aquí se mostrarán los detalles del routing -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-12">
-                    <button type="button" class="enviar btn btn-success w-100" onclick="sendPostRequest()">Enviar</button>
-                </div>
-            </form>
-            <h2 class="mt-4">Estado:</h2>
-            <p id="status2" class="border rounded p-2 bg-light text-secondary">Sin estado aún...</p>
+            </div>
         </fieldset>
 
-        <!-- Topología -->
+        <!-- Network Topology -->
         <fieldset class="border p-4">
-            <legend class="float-none w-auto px-3 h2 text-info">Topología</legend>
-            <p class="text-muted">Para cargar la topologia debe iniciar la aplicacion <strong>App para Topologia</strong>.</p>
-            <button id="load-topology" class="btn btn-primary mb-3">Cargar Topología</button>
-            <div id="cy" class="border rounded bg-light p-4" style="height: 300px; overflow: auto;">
+            <legend class="float-none w-auto px-3 h2 text-info">Topología NSFNET</legend>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <button id="load-topology" class="btn btn-primary">Actualizar Topología</button>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="show-bandwidth">
+                        <label class="form-check-label" for="show-bandwidth">Mostrar ancho de banda en enlaces</label>
+                    </div>
+                </div>
+            </div>
+            <div id="cy" style="height: 500px; border: 1px solid #ccc;">
                 <!-- Aquí se cargará la topología -->
+            </div>
+            <div class="mt-3">
+                <p class="text-muted small">
+                    <span class="badge bg-primary">■</span> Switch &nbsp;
+                    <span class="badge bg-success">■</span> Host &nbsp;
+                    Los números en los enlaces indican el ancho de banda (Mbps)
+                </p>
             </div>
         </fieldset>
     </div>
 
-
     <script>
-        // Función para manejar el inicio de la aplicación Ryu
-        // Enviar un string con Fetch
-        document.getElementById("start-ryu").addEventListener("click", async () => {
-            const selectedApp = document.getElementById("app-select").value;
-            const myString = "Hola mundo"; // String que deseas enviar
+        // Utility Functions
+        function showMessage(message, type = 'info') {
+            const statusElement = document.getElementById('system-status-message');
+            statusElement.className = `alert alert-${type} mt-3`;
+            statusElement.style.display = 'block';
+            statusElement.textContent = message;
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 5000);
+        }
 
+        function updateStatusBadge(elementId, isActive) {
+            const badge = document.getElementById(elementId);
+            badge.className = `badge ${isActive ? 'bg-success' : 'bg-danger'}`;
+            badge.textContent = isActive ? 'Activo' : 'Inactivo';
+        }
+
+        // System Status
+        async function updateSystemStatus() {
             try {
-                const response = await fetch('http://localhost:8000/start-ryu', {
+                const response = await fetch('http://localhost:8000/status');
+                const status = await response.json();
+                updateStatusBadge('ryu-status', status.ryu);
+                updateStatusBadge('mininet-status', status.mininet);
+            } catch (error) {
+                console.error('Error al actualizar estado:', error);
+            }
+        }
+
+        // System Control
+        document.getElementById('start-system').addEventListener('click', async () => {
+            try {
+                showMessage('Iniciando sistema...', 'info');
+                const response = await fetch('http://localhost:8000/start-all', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        app_name: selectedApp,
-                        my_string: myString // Enviar el string como parte de los datos
+                        app_name: 'simple_switch_13.py',
+                        topology_file: 'nsfnet.py'
                     })
                 });
-
                 const data = await response.json();
-                document.getElementById("status").innerText = data.message;
+                showMessage(data.message, 'success');
+                updateSystemStatus();
+                // Cargamos la topología automáticamente al iniciar
+                setTimeout(loadAndDisplayTopology, 5000);
             } catch (error) {
-                document.getElementById("status").innerText = `Error: ${error.message}`;
+                showMessage('Error al iniciar el sistema: ' + error.message, 'danger');
             }
         });
 
-
-        // Función para manejar la detención de la aplicación Ryu
-        document.getElementById("stop-ryu").addEventListener("click", async () => {
+        document.getElementById('stop-system').addEventListener('click', async () => {
             try {
-                const response = await axios.post('http://localhost:8000/stop-ryu'/*, { my_string: "Hola mundo" }*/);
-                document.getElementById("status").innerText = response.data.message;
+                showMessage('Deteniendo sistema...', 'info');
+                const response = await fetch('http://localhost:8000/stop-all', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                showMessage(data.message, 'success');
+                updateSystemStatus();
             } catch (error) {
-                document.getElementById("status").innerText = `Error: ${error.response ? error.response.data.message : error.message}`;
+                showMessage('Error al detener el sistema: ' + error.message, 'danger');
             }
         });
+
+        // Routing Control
+        async function updateRoutingStatus() {
+            try {
+                const response = await fetch('http://localhost:8000/routing/status');
+                const data = await response.json();
+                const statusEl = document.getElementById('routing-status');
+                const detailsEl = document.getElementById('routing-details');
+                
+                statusEl.innerText = `Modo actual: ${data.mode === 'dijkstra_bw' ? 'Dijkstra (1/bandwidth)' : 'Shortest Path (hops)'}`;
+                
+                // Mostrar algunas rutas como ejemplo
+                if (data.routes) {
+                    const routesList = Object.entries(data.routes).slice(0, 5);
+                    detailsEl.innerHTML = '<h6 class="mt-3">Algunas rutas calculadas:</h6>' +
+                        '<ul class="list-unstyled small">' +
+                        routesList.map(([path, route]) => `<li>${path}: ${route.join(' → ')}</li>`).join('') +
+                        '</ul>';
+                }
+            } catch (error) {
+                console.error('Error al actualizar estado del routing:', error);
+            }
+        }
+
+        document.getElementById('apply-routing').addEventListener('click', async () => {
+            const mode = document.getElementById('routing-select').value;
+            document.getElementById('routing-status').innerText = 'Aplicando algoritmo...';
+            try {
+                const response = await fetch('http://localhost:8000/routing/mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode })
+                });
+                const data = await response.json();
+                showMessage(data.message, 'success');
+                updateRoutingStatus();
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'danger');
+            }
+        });
+
+        // Topology Visualization
+        let cy = null;
+        
+        async function loadAndDisplayTopology() {
+            try {
+                const [linksRes, hostsRes] = await Promise.all([
+                    fetch('http://localhost:8000/v1.0/topology/links'),
+                    fetch('http://localhost:8000/v1.0/topology/hosts')
+                ]);
+                
+                const links = await linksRes.json();
+                const hosts = await hostsRes.json();
+
+                const elements = [];
+                const nodeSet = new Set();
+                const edgeSet = new Set();
+
+                // Process switches and links
+                links.forEach(link => {
+                    const srcId = link.src.dpid;
+                    const dstId = link.dst.dpid;
+                    
+                    if (!nodeSet.has(srcId)) {
+                        elements.push({
+                            data: {
+                                id: srcId,
+                                label: `S${parseInt(srcId, 16)}`,
+                                type: 'switch'
+                            }
+                        });
+                        nodeSet.add(srcId);
+                    }
+                    
+                    if (!nodeSet.has(dstId)) {
+                        elements.push({
+                            data: {
+                                id: dstId,
+                                label: `S${parseInt(dstId, 16)}`,
+                                type: 'switch'
+                            }
+                        });
+                        nodeSet.add(dstId);
+                    }
+
+                    const edgeId = `${srcId}-${dstId}`;
+                    if (!edgeSet.has(edgeId)) {
+                        elements.push({
+                            data: {
+                                id: edgeId,
+                                source: srcId,
+                                target: dstId,
+                                bandwidth: link.bw || 'N/A'
+                            }
+                        });
+                        edgeSet.add(edgeId);
+                    }
+                });
+
+                // Process hosts
+                hosts.forEach(host => {
+                    const hostId = `h-${host.mac}`;
+                    elements.push({
+                        data: {
+                            id: hostId,
+                            label: `H${host.mac.slice(-2)}`,
+                            type: 'host'
+                        }
+                    });
+
+                    elements.push({
+                        data: {
+                            id: `${hostId}-${host.port.dpid}`,
+                            source: hostId,
+                            target: host.port.dpid
+                        }
+                    });
+                });
+
+                if (cy) {
+                    cy.destroy();
+                }
+
+                const showBandwidth = document.getElementById('show-bandwidth').checked;
+
+                cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: elements,
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'font-size': '12px',
+                                'width': '40px',
+                                'height': '40px',
+                                'color': '#fff'
+                            }
+                        },
+                        {
+                            selector: 'node[type="switch"]',
+                            style: {
+                                'background-color': '#0074D9',
+                                'shape': 'rectangle'
+                            }
+                        },
+                        {
+                            selector: 'node[type="host"]',
+                            style: {
+                                'background-color': '#2ECC40',
+                                'shape': 'ellipse'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 2,
+                                'line-color': '#666',
+                                'curve-style': 'bezier',
+                                'label': showBandwidth ? 'data(bandwidth)' : '',
+                                'font-size': '10px'
+                            }
+                        }
+                    ],
+                    layout: {
+                        name: 'cose',
+                        padding: 50,
+                        nodeRepulsion: 8000,
+                        idealEdgeLength: 100
+                    }
+                });
+
+            } catch (error) {
+                showMessage('Error al cargar la topología: ' + error.message, 'danger');
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('refresh-status').addEventListener('click', updateSystemStatus);
+        document.getElementById('load-topology').addEventListener('click', loadAndDisplayTopology);
+        document.getElementById('show-bandwidth').addEventListener('change', loadAndDisplayTopology);
+
+        // Initial load
+        updateSystemStatus();
+        setInterval(updateSystemStatus, 10000);
+        setInterval(updateRoutingStatus, 5000);
     </script>
 
-<script>
-
-    function loadAndDisplayTopology() { // Function to load and display topology
-        
-        async function fetchTopology() {
-      try {
-        const responseLinks = await fetch("http://127.0.0.1:8000/v1.0/topology/links");
-        const responseHosts = await fetch("http://127.0.0.1:8000/v1.0/topology/hosts");
-
-        if (!responseLinks.ok || !responseHosts.ok) {
-          throw new Error("Error al obtener los enlaces o los hosts");
-        }
-
-        const links = await responseLinks.json();
-        const hosts = await responseHosts.json();
-
-        const elements = [];
-        const nodeSet = new Set(); // Para evitar nodos duplicados
-        const edgeSet = new Set(); // Para evitar enlaces redundantes
-
-        let hostCounter = 1; // Contador para enumerar los hosts
-
-        // Procesar enlaces (switches)
-        if (links.length === 0) {
-          const singleSwitchId = "0000000000000001";
-          elements.push({ data: { id: singleSwitchId, label: `S ${singleSwitchId.slice(-1)}` } });
-        } else {
-          links.forEach(link => {
-            const srcId = link.src.dpid.trim();
-            const dstId = link.dst.dpid.trim();
-
-            const srcName = `${link.src.dpid}-${link.src.name}`;
-            const dstName = `${link.dst.dpid}-${link.dst.name}`;
-
-            const edgeKey = [srcName, dstName].sort().join("-");
-
-            // Agregar nodos únicos
-            if (!nodeSet.has(srcId)) {
-              elements.push({ data: { id: srcId, label: `S ${parseInt(srcId, 16)}` } });
-              nodeSet.add(srcId);
-            }
-            if (!nodeSet.has(dstId)) {
-              elements.push({ data: { id: dstId, label: `S ${parseInt(dstId, 16)}` } });
-              nodeSet.add(dstId);
-            }
-
-            if (!edgeSet.has(edgeKey)) {
-              elements.push({
-                data: {
-                  id: edgeKey,
-                  source: srcId,
-                  target: dstId,
-                  label: `${link.src.name}_${link.dst.name}`
-                }
-              });
-              edgeSet.add(edgeKey);
-            }
-          });
-        }
-
-        // Procesar hosts
-        hosts.forEach(host => {
-          const hostId = `host-${host.mac}`;
-          const switchId = host.port.dpid.trim();
-         
-          // Agregar el host como nodo
-          if (!nodeSet.has(hostId)) {
-            elements.push({
-              data: {
-                id: hostId,
-                label: `H ${hostCounter++}`, // Cambiar el formato de la etiqueta
-                type: 'host'
-              }
-            });
-            nodeSet.add(hostId);
-          }
-
-          // Agregar enlace entre el host y el switch
-          const edgeKey = `host-${host.mac}-${switchId}`;
-          if (!edgeSet.has(edgeKey)) {
-            elements.push({
-              data: {
-                id: edgeKey,
-                source: hostId,
-                target: switchId,
-                label: `${host.port.name}`
-              }
-            });
-            edgeSet.add(edgeKey);
-          }
-        });
-
-        // Crear el gráfico con Cytoscape.js
-        cytoscape({
-          container: document.getElementById('cy'),
-          elements: elements,
-          style: [
-            {
-              selector: 'node',
-              style: {
-                'background-color': '#0074D9',
-                'label': 'data(label)',
-                'color': '#fff',
-                'font-size': '10px',
-                'text-valign': 'center',
-                'shape': 'ellipse' // Forma predeterminada para los switches
-              }
-            },
-            {
-              selector: 'node[type="host"]',
-              style: {
-                'background-color': '#A9A9A9', // Color gris para los hosts
-                'shape': 'square' // Forma cuadrada para los hosts
-              }
-            },
-            {
-              selector: 'edge',
-              style: {
-                'width': 2,
-                'line-color': '#FF4136',
-                'target-arrow-color': '#FF4136',
-                'target-arrow-shape': 'none',
-                'curve-style': 'bezier',
-                'label': 'data(label)',
-                'font-size': '6px'
-              }
-            }
-          ],
-          layout: {
-            name: 'cose',
-            animate: true,
-            randomize: true,
-            fit: true
-          }
-        });
-
-      } catch (error) {
-        console.error("Error:", error);
-        alert("No se pudo cargar la topología de red.");
-      }
-    }
-    fetchTopology();
-    } 
-    
-
-    document.getElementById('load-topology').addEventListener('click', loadAndDisplayTopology);
-  </script>
-
-<script>
-    function sendPostRequest() {
-        const url = "http://127.0.0.1:8000/stats/flowentry/add"; // Cambia el puerto si es necesario
-       
-        // Obtener los valores ingresados por el usuario
-        const dpid = document.getElementById("dpid").value;
-        const in_port = document.getElementById("in_port").value;
-        const port = document.getElementById("port").value;
-        const idle_timeout = document.getElementById("idle_timeout").value;
-        const hard_timeout = document.getElementById("hard_timeout").value;
-        const priority = document.getElementById("priority").value;
-
-        // Construir el cuerpo de la solicitud
-        const data = {
-            "dpid": parseInt(dpid),
-            "cookie": 1,
-            "cookie_mask": 1,
-            "table_id": 0,
-            "idle_timeout": parseInt(idle_timeout),
-            "hard_timeout": parseInt(hard_timeout),
-            "priority": parseInt(priority),
-            "flags": 1,
-            "match": {"in_port": parseInt(in_port)},
-            "instructions": [
-                    { "type": "APPLY_ACTIONS", "actions": [{ "type": "OUTPUT", "port": parseInt(port) }] }
-                ]
-        };
-
-        // Enviar la solicitud POST
-        fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(data),
-            mode: "cors"
-        })
-        .then(response => {
-        if (response.ok) {
-            return response.text(); // or response.json() if the server returns JSON
-        } else {
-            throw new Error("Error al enviar la solicitud");
-        }
-    })
-    .then(data => {
-        document.getElementById("status2").textContent = "Flow added successfully: " + data; // Display success message
-    })
-    .catch(error => {
-        console.error("Error:", error);
-        document.getElementById("status2").textContent = "Error adding flow: " + error.message; // Display error message
-    });
-    }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
