@@ -1,85 +1,69 @@
-# Controlador Ryu — Proyecto para la tarea de Forwarding/Control/Application/Management planes
+# SDN Controller over NSFNET — Ryu + Mininet
 
-Resumen
--------
-Este repositorio contiene un proyecto de ejemplo que implementa los componentes solicitados del siguiente requerimiento:
+> **TL;DR** — A Software-Defined Networking project that separates the four network planes and lets you
+> pick a routing algorithm from a web panel and apply it live over a simulated **NSFNET** topology. The
+> control plane (Ryu) computes paths with NetworkX (Dijkstra weighted by `1/bandwidth`, or shortest-hop)
+> and the management plane (FastAPI + web UI) drives it.
+>
+> **Stack:** Ryu · Mininet + Open vSwitch · NetworkX · FastAPI · vanilla JS UI. **Domain:** telecom / SDN.
 
-- Forwarding plane: Topología NSFNET simulada con Mininet (`mininet_nsfnnet.py`) usando Open vSwitch (TCLink con bw).
-- Control plane: Ryu como controlador SDN (app incluida `ryu_routing_app.py`).
-- Application plane: aplicación Ryu que calcula rutas con NetworkX (Dijkstra con peso 1/bandwidth y shortest path por hops) e instala flujos proactivamente (esqueleto).
-- Management plane: API FastAPI (`servidor.py`) y UI (`aplicacion.html`) para iniciar apps, elegir algoritmo de routing y monitorizar estado.
+---
 
-Importante
-----------
-- El entorno de ejecución recomendado es Linux (Ubuntu) o WSL2 con un kernel completo. Mininet y Open vSwitch funcionan mejor en Linux nativo.
-- Para la demo local es conveniente ejecutar Ryu y Mininet en la misma máquina/VM.
+## 1. What it solves
+Classic networks couple forwarding and control on each device. SDN centralizes control so routing policy
+becomes software you can change on the fly. This project demonstrates that end to end on the 14-node
+**NSFNET** topology: choose a routing strategy in the UI and see the controller recompute and program paths.
 
-Requisitos
-----------
-- Python 3.8+
-- Mininet (recomendado instalar con apt: `sudo apt-get install mininet`) o desde fuente
-- Open vSwitch (suele venir con Mininet)
-- Ryu (pip install ryu) — algunas distribuciones requieren instalar desde repositorio
+## 2. The four planes
 
-Dependencias Python
--------------------
-Instala las dependencias listadas en `requirements.txt`. En Linux/WSL2:
+```mermaid
+graph TD
+    subgraph Management Plane
+        UI[Web UI - aplicacion.html] -->|REST| API[FastAPI - servidor.py]
+    end
+    API -->|/routing/mode| APP
+    subgraph Application Plane
+        APP[Ryu routing app - ryu_routing_app.py<br/>NetworkX: Dijkstra 1/bw or shortest-hop]
+    end
+    subgraph Control Plane
+        APP --> RYU[Ryu controller<br/>OpenFlow, WSGI REST :8080]
+    end
+    subgraph Forwarding Plane
+        RYU -->|OpenFlow :6633| OVS[Open vSwitch switches]
+        OVS --- TOPO[Mininet NSFNET<br/>14 switches / 14 hosts - mininet_nsfnnet.py]
+    end
+```
 
+| Plane | Component | Role |
+|---|---|---|
+| Forwarding | Mininet + Open vSwitch (`mininet_nsfnnet.py`) | 14-switch NSFNET topology, `TCLink` bandwidth |
+| Control | Ryu controller | Speaks OpenFlow to the switches; exposes a WSGI REST API |
+| Application | `ryu_routing_app.py` | Builds the graph with NetworkX, computes routes, programs flows |
+| Management | `servidor.py` (FastAPI) + `aplicacion.html` | Start apps, pick algorithm, monitor state |
+
+## 3. Run it (Linux / WSL2 recommended)
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Nota: Mininet es preferible instalarlo por apt para evitar problemas.
-
-Cómo ejecutar (pasos recomendados)
----------------------------------
-1. Arranca Ryu con la app de routing (en Linux/VM):
-
-```bash
-# desde la carpeta del proyecto
-ryu-manager ryu_routing_app.py &
-```
-
-Ryu expondrá su API REST (WSGI) en el puerto por defecto (por lo general 8080). Si usas una configuración distinta, actualiza `servidor.py` RYU_SERVER_IP/PORT.
-
-2. Arranca Mininet con la topología NSFNET:
-
-```bash
-python3 mininet_nsfnnet.py
-```
-
-La topología crea 14 switches y 14 hosts (h1..h14), y conecta un RemoteController apuntando a `127.0.0.1:6633`.
-
-3. Arranca el backend FastAPI (puedes usar la máquina host o otra terminal):
-
-```bash
+# 1) Controller + routing app
+ryu-manager ryu_routing_app.py &          # Ryu REST API on :8080
+# 2) Topology
+sudo python3 mininet_nsfnnet.py            # 14 switches + hosts h1..h14 -> RemoteController 127.0.0.1:6633
+# 3) Management API
 uvicorn servidor:app --host 0.0.0.0 --port 8000 --reload
+# 4) UI
+python3 -m http.server 5500                # open http://localhost:5500/aplicacion.html
 ```
+In the UI, pick **Dijkstra (1/bandwidth)** or **shortest-hop** and apply it; the request proxies through
+FastAPI to the Ryu app, which recomputes routes. Generate traffic from the Mininet CLI (`h1 ping h2`,
+`iperf`) to observe behavior.
 
-4. Sirve el frontend o ábrelo localmente:
+## 4. Scope & limitations (honest status)
+This is an academic project demonstrating the SDN plane separation. Current implementation:
+- Route computation with NetworkX and REST endpoints: **working**.
+- Proactive flow installation via `OFPFlowMod` and port mapping between switches: **partial** — the app
+  builds the graph and exposes the control API; full match/timeout/priority rules and automatic
+  recomputation on link/switch-down events are the natural next steps.
 
-```bash
-# opción simple: servir con http.server
-python3 -m http.server 5500
-# abrir http://localhost:5500/aplicacion.html
-```
-
-Flujo de la demo
------------------
-1. En la UI selecciona "App para topologia" y pulsa "Iniciar Aplicación" si quieres controlar una app Ryu remota (esta app está pensada para arrancar Ryu vía SSH si lo deseas). Para una demo local, arranca Ryu localmente con `ryu-manager ryu_routing_app.py`.
-2. En la sección Application Plane elige el algoritmo (Dijkstra 1/bandwidth o Shortest-hop) y pulsa "Aplicar Algoritmo" — esto llamará al endpoint `/routing/mode` del backend, que a su vez proxyará la petición al app Ryu. La app Ryu calculará rutas y (esqueleto) instalará flujos proactivamente.
-3. Usa Mininet CLI para generar tráfico entre hosts (por ejemplo `h1 ping h2` o `iperf`) y observa cambios en la topología o métricas.
-
-Notas y siguientes pasos
------------------------
-- El código de `ryu_routing_app.py` es un esqueleto funcional que construye el grafo con `networkx` y expone endpoints REST. Para un despliegue real se recomienda completar:
-  - Mapeo real de puertos entre switches (para determinar `out_port` en `_port_to_neighbor`).
-  - Uso de los objetos Datapath de Ryu para enviar OFPFlowMod y reglas completas (match por IP/MAC, timeouts, prioridad).
-  - Manejo de fallos y recalculado automático sobre eventos de link/switch down.
-- Diagrama de arquitectura, despliegue y secuencias deben añadirse como artefactos gráficos para la sustentación (puedes crearlos con draw.io o similar y colocarlos en `docs/`).
-
-Contribuir
----------
-Si quieres que yo implemente las partes pendientes (instalación real de flujos OF v1.3, mapeo de puertos desde la topología, y ejemplos de monitorización), indícalo y lo hago en el repo.
+## 5. Requirements
+Python 3.8+, Mininet (install via `apt`), Open vSwitch (ships with Mininet), Ryu (`pip install ryu`).
